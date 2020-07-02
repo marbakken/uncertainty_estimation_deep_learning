@@ -32,7 +32,7 @@ parser.add_argument('--tau', default=1e-4, type=float,
 # Testing flags
 parser.add_argument('--load_model_name', default='resnet18_dropout', type=str,  
                     help='model to load')
-parser.add_argument('--test_model_name', default='resnet18_dropout_adf', type=str,  
+parser.add_argument('--test_model_name', default='resnet18_dropout', type=str,  
                     help='model to test')
 parser.add_argument('--resume', '-r', action='store_true', default=True, 
                     help='resume from checkpoint')
@@ -40,7 +40,7 @@ parser.add_argument('--show_bar', '-b', action='store_true', default=True,
                     help='show bar or not')
 parser.add_argument('--verbose', '-v', action='store_true', default=True, 
                     help='regulate output verbosity')
-parser.add_argument('--use_mcdo', '-m', action='store_true', default=False,  
+parser.add_argument('--use_mcdo', '-m', action='store_true', default=True,  
                     help='use Monte Carlo dropout to compute predictions and'
                     'model uncertainty estimates.')
 args = parser.parse_args()
@@ -120,9 +120,20 @@ if args.resume:
     # if model_to_load.endswith('adf'):
     #     model_to_load = model_to_load[0:-4]
     ckpt_path = './checkpoint/ckpt_{}.pth'.format(model_to_load)
-    checkpoint = torch.load(ckpt_path,map_location=torch.device(device))
+    checkpoint = torch.load(ckpt_path,map_location='cpu')
     if args.verbose: print('Loaded checkpoint at location {}'.format(ckpt_path))
-    net.load_state_dict(checkpoint['net'],strict=False)
+
+    #Preliminary bugfix for CPU execution
+    state_dict = checkpoint['net']
+    if device == 'cpu':
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            name = k[7:] # remove 'module.' of dataparallel
+            new_state_dict[name]=v
+        state_dict = new_state_dict
+        
+    net.load_state_dict(new_state_dict)
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
 
